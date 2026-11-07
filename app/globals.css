@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #071a3d;
+  --color-navy-800: #0b2350;
+  --color-navy-700: #0f2c63;
+  --color-primary: #1456a0;
+  --color-primary-600: #1456a0;
+  --color-primary-500: #1a67bb;
+  --color-sky: #4da3ff;
+  --color-sky-soft: #e8f2ff;
+  --color-surface: #f5f7fb;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e3e8f2;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --shadow-soft: 0 10px 30px -12px rgb(7 26 61 / 0.18);
+  --shadow-card: 0 1px 2px rgb(7 26 61 / 0.04), 0 12px 32px -18px rgb(7 26 61 / 0.25);
+  --shadow-float: 0 24px 60px -24px rgb(7 26 61 / 0.35);
+
+  --radius-xl2: 1.25rem;
+}
+
+:root {
+  --background: #f5f7fb;
+  --foreground: #0f172a;
+  color-scheme: light;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #1456a0;
+  color: #fff;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #f5f7fb;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+  }
+  .glass-dark {
+    background: rgba(7, 26, 61, 0.55);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+  .hero-gradient {
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(77, 163, 255, 0.28), transparent 60%),
+      radial-gradient(900px 500px at 90% 10%, rgba(20, 86, 160, 0.35), transparent 55%),
+      linear-gradient(160deg, #071a3d 0%, #0b2350 55%, #071a3d 100%);
+  }
+  .grid-pattern {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  .text-gradient {
+    background: linear-gradient(100deg, #ffffff 0%, #bfe0ff 55%, #4da3ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .card-hover {
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease,
+      border-color 0.25s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-float);
+    border-color: #cddcf3;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e9eef7;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+/* Printable attendance register */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9.5px !important;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #111 !important;
+    padding: 4px 5px !important;
+    color: #000 !important;
+    vertical-align: top;
+  }
+
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table tr {
+    page-break-inside: avoid;
+  }
+
+  .print-signatures {
+    page-break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}
+
+.print-only {
+  display: none;
+}

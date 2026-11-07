@@ -1,0 +1,20 @@
+npm notice run vist-mubiligi@0.1.0 dev
+npm notice run next dev
+   ▲ Next.js 15.5.28
+   - Local:        http://localhost:3000
+   - Network:      http://10.15.122.185:3000
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 8.1s
+ ○ Compiling / ...
+ ✓ Compiled / in 3.7s (1117 modules)
+ GET / 200 in 5698ms
+ GET / 200 in 277ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 820ms (899 modules)
+ GET /favicon.ico 200 in 1085ms
+ ○ Compiling /signup ...
+ ✓ Compiled /signup in 4.1s (2430 modules)
+ GET /signup 200 in 4751ms

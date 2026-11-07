@@ -1,0 +1,10 @@
+{
+  "name": "MUBILIGI VISIT DAY",
+  "short_name": "Mubiligi Visit",
+  "description": "Internal parent attendance and Visit Day management for MSGR MUBILIGI TSS.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#071a3d",
+  "orientation": "portrait-primary"
+}
