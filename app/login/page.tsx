@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ArrowLeft, BellRing, CheckCircle2, LockKeyhole, ShieldCheck, Users } from "lucide-react";
 import { Brand } from "@/frontend/components/ui/brand";
 import { LoginForm } from "@/frontend/components/forms/login-form";
-import { backendMode } from "@/backend/data";
 import { SCHOOL } from "@/shared/constants";
 
 export const metadata: Metadata = {
@@ -13,8 +12,6 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
-  const showDemo = backendMode === "local" && process.env.NODE_ENV !== "production";
-
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
       <div className="hero-gradient relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-12">
@@ -89,7 +86,7 @@ export default function LoginPage() {
             </div>
 
             <div className="rounded-2xl border border-line bg-white p-5 shadow-[0_1px_2px_rgba(7,26,61,0.04),0_20px_50px_-30px_rgba(7,26,61,0.35)] sm:p-7">
-              <LoginForm showDemo={showDemo} />
+              <LoginForm />
             </div>
 
             <p className="mt-5 text-center text-[11px] leading-relaxed text-slate-400">

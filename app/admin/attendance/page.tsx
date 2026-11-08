@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/backend/auth/session";
 import { backend } from "@/backend/data";
-import { todayKigali } from "@/shared/utils";
+import { DEFAULT_VISIT_DATE } from "@/shared/constants";
 import { ErrorState } from "@/frontend/components/ui/error-state";
 import { AttendanceBoard } from "@/frontend/components/attendance/attendance-board";
 import type { RegistrationFilters } from "@/shared/types";
@@ -22,7 +22,7 @@ export default async function AdminAttendancePage({
 }) {
   const user = await requirePermission("attendance.view");
   const raw = await searchParams;
-  const date = pick(raw.date) ?? todayKigali();
+  const date = pick(raw.date) ?? DEFAULT_VISIT_DATE;
 
   const filters: RegistrationFilters = {
     search: pick(raw.search),

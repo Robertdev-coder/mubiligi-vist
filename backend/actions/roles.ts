@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { backend } from "@/backend/data";
 import { getSessionUser } from "@/backend/auth/session";
+import { PERMISSION_KEYS } from "@/shared/constants";
+import type { PermissionKey } from "@/shared/types";
 import { firstZodError, roleSchema, type ActionState } from "@/shared/validation/schemas";
 
 async function roleManager() {
@@ -124,7 +126,14 @@ export async function saveRolePermissionsAction(
 
   const key = String(formData.get("key") ?? "");
   if (!key) return { ok: false, message: "Role not found." };
-  const permissions = formData.getAll("permissions").map(String);
+  const submittedPermissions = formData.getAll("permissions").map(String);
+  const validPermissions = new Set<string>(PERMISSION_KEYS);
+  if (submittedPermissions.some((permission) => !validPermissions.has(permission))) {
+    return { ok: false, message: "One or more selected permissions are invalid." };
+  }
+  const permissions = submittedPermissions.filter(
+    (permission): permission is PermissionKey => validPermissions.has(permission),
+  );
 
   try {
     await backend.setRolePermissions(key, permissions);

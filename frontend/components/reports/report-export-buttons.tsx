@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 import {
-  PURPOSE_LABEL,
   REGISTRATION_STATUS_LABEL,
   RELATIONSHIP_LABEL,
   TRADE_LABEL,
@@ -25,11 +24,9 @@ const HEADERS = [
   "Phone",
   "Relationship",
   "Student",
-  "Student Reg. No",
   "Trade",
   "Level",
   "Class",
-  "Purpose",
   "Status",
   "Arrival",
   "Departure",
@@ -44,11 +41,9 @@ function tableData(rows: RegistrationRow[]) {
     row.visitor.phone,
     RELATIONSHIP_LABEL[row.visitor.relationship],
     row.student.full_name,
-    row.student.registration_number,
     TRADE_LABEL[row.student.trade],
     row.student.level,
     row.student.class_name,
-    PURPOSE_LABEL[row.purpose],
     REGISTRATION_STATUS_LABEL[row.status],
     row.attendance?.arrival_time ? formatTimeKigali(row.attendance.arrival_time) : "—",
     row.attendance?.departure_time ? formatTimeKigali(row.attendance.departure_time) : "—",
@@ -91,6 +86,89 @@ export function ReportExportButtons({
       toast.success("Excel report downloaded.");
     } catch {
       toast.error("Could not generate the Excel report.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function exportWord() {
+    try {
+      setBusy("word");
+      const {
+        BorderStyle,
+        Document,
+        HeadingLevel,
+        PageOrientation,
+        Packer,
+        Paragraph,
+        Table,
+        TableCell,
+        TableRow,
+        TextRun,
+        WidthType,
+      } = await import("docx");
+      const cellWidth = 15840 / HEADERS.length;
+      const border = { style: BorderStyle.SINGLE, size: 1, color: "D1D5DB" };
+      const makeCell = (text: string, bold = false) =>
+        new TableCell({
+          width: { size: cellWidth, type: WidthType.DXA },
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text, bold, size: 16 })],
+            }),
+          ],
+        });
+      const table = new Table({
+        width: { size: 15840, type: WidthType.DXA },
+        columnWidths: HEADERS.map(() => cellWidth),
+        rows: [
+          new TableRow({ children: HEADERS.map((header) => makeCell(header, true)) }),
+          ...tableData(rows).map(
+            (row) => new TableRow({ children: row.map((value) => makeCell(value)) }),
+          ),
+        ],
+        borders: {
+          top: border,
+          bottom: border,
+          left: border,
+          right: border,
+          insideHorizontal: border,
+          insideVertical: border,
+        },
+      });
+      const document = new Document({
+        sections: [
+          {
+            properties: {
+              page: {
+                size: { orientation: PageOrientation.LANDSCAPE },
+                margin: { top: 500, right: 500, bottom: 500, left: 500 },
+              },
+            },
+            children: [
+              new Paragraph({
+                text: "MSGR MUBILIGI TSS",
+                heading: HeadingLevel.HEADING_1,
+              }),
+              new Paragraph({ text: "MUBILIGI VISIT DAY — Attendance Register" }),
+              new Paragraph({
+                text: `Visit date: ${formatDateKigali(date, "EEEE, dd MMMM yyyy")}`,
+              }),
+              new Paragraph({
+                text: `Generated: ${formatDateKigali(new Date(), "dd MMM yyyy, HH:mm")}`,
+              }),
+              new Paragraph({ text: "" }),
+              table,
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(document);
+      downloadBlob(blob, `${baseName}.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      toast.success("Word report downloaded.");
+    } catch {
+      toast.error("Could not generate the Word report.");
     } finally {
       setBusy(null);
     }
@@ -140,6 +218,10 @@ export function ReportExportButtons({
       <Button size="sm" variant="outline" onClick={exportExcel} disabled={busy !== null || rows.length === 0}>
         {busy === "excel" ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet />}
         Excel
+      </Button>
+      <Button size="sm" variant="outline" onClick={exportWord} disabled={busy !== null || rows.length === 0}>
+        {busy === "word" ? <Loader2 className="size-4 animate-spin" /> : <FileText />}
+        Word
       </Button>
       <Button size="sm" variant="outline" onClick={exportPdf} disabled={busy !== null || rows.length === 0}>
         {busy === "pdf" ? <Loader2 className="size-4 animate-spin" /> : <FileText />}

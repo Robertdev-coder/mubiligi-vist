@@ -19,9 +19,10 @@ import { OfflineQueuePanel } from "@/frontend/components/attendance/offline-queu
 import {
   registrationSchema,
   type ActionState,
+  type RegistrationFormValues,
   type RegistrationInput,
 } from "@/shared/validation/schemas";
-import { LEVELS, PURPOSES, RELATIONSHIPS, TRADES } from "@/shared/constants";
+import { LEVELS, RELATIONSHIPS, TRADES } from "@/shared/constants";
 import { cn, formatDateKigali } from "@/shared/utils";
 import type { VisitDay } from "@/shared/types";
 
@@ -76,13 +77,12 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<RegistrationInput>({
+  } = useForm<RegistrationFormValues, unknown, RegistrationInput>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
       fullName: "",
       phone: "",
       email: "",
-      nationalId: "",
       relationship: "parent",
       studentFullName: "",
       studentRegistrationNumber: "",
@@ -90,7 +90,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
       level: "L3",
       className: "",
       visitDayId: visitDays[0]?.id ?? "",
-      purpose: "academic",
       message: "",
     },
   });
@@ -103,7 +102,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
         fullName: "",
         phone: "",
         email: "",
-        nationalId: "",
         relationship: "parent",
         studentFullName: "",
         studentRegistrationNumber: "",
@@ -111,7 +109,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
         level: "L3",
         className: "",
         visitDayId: visitDays.find((day) => day.is_active)?.id ?? "",
-        purpose: "academic",
         message: "",
       });
       router.refresh();
@@ -129,7 +126,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
           fullName: "",
           phone: "",
           email: "",
-          nationalId: "",
           relationship: "parent",
           studentFullName: "",
           studentRegistrationNumber: "",
@@ -137,7 +133,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
           level: "L3",
           className: "",
           visitDayId: visitDays.find((day) => day.is_active)?.id ?? "",
-          purpose: "academic",
           message: "",
         });
       } catch (error) {
@@ -186,14 +181,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
             <Input id="email" type="email" placeholder="you@example.com" invalid={Boolean(errors.email)} {...register("email")} />
           </Field>
           <Field
-            label="National ID"
-            htmlFor="nationalId"
-            error={errors.nationalId?.message ?? serverErrors.nationalId}
-            hint="16 digits, if available."
-          >
-            <Input id="nationalId" inputMode="numeric" invalid={Boolean(errors.nationalId)} {...register("nationalId")} />
-          </Field>
-          <Field
             label="Relationship"
             htmlFor="relationship"
             required
@@ -223,20 +210,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
             className="sm:col-span-2"
           >
             <Input id="studentFullName" invalid={Boolean(errors.studentFullName)} {...register("studentFullName")} />
-          </Field>
-          <Field
-            label="Registration number"
-            htmlFor="studentRegistrationNumber"
-            required
-            error={errors.studentRegistrationNumber?.message ?? serverErrors.studentRegistrationNumber}
-          >
-            <Input
-              id="studentRegistrationNumber"
-              placeholder="SOD/L3/001"
-              className="font-mono uppercase"
-              invalid={Boolean(errors.studentRegistrationNumber)}
-              {...register("studentRegistrationNumber")}
-            />
           </Field>
           <Field label="Class" htmlFor="className" required error={errors.className?.message ?? serverErrors.className}>
             <Input id="className" placeholder="SOD L3 A" invalid={Boolean(errors.className)} {...register("className")} />
@@ -278,15 +251,6 @@ export function StaffRegistrationForm({ visitDays, actorId }: { visitDays: Visit
               {visitDays.map((day) => (
                 <option key={day.id} value={day.id}>
                   {formatDateKigali(day.visit_date, "EEEE, dd MMMM yyyy")} — {day.title}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Purpose" htmlFor="purpose" required error={errors.purpose?.message ?? serverErrors.purpose}>
-            <Select id="purpose" invalid={Boolean(errors.purpose)} {...register("purpose")}>
-              {PURPOSES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
                 </option>
               ))}
             </Select>

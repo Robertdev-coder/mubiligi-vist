@@ -16,7 +16,8 @@ import { StatusBadge } from "@/frontend/components/ui/badge";
 import { EmptyState } from "@/frontend/components/ui/empty-state";
 import { AttendanceDatePicker } from "@/frontend/components/attendance/attendance-date-picker";
 import { ReportExportButtons } from "@/frontend/components/reports/report-export-buttons";
-import { REGISTRATION_STATUSES } from "@/shared/constants";
+import { ReportEmailForm } from "@/frontend/components/reports/report-email-form";
+import { REGISTRATION_STATUSES, workspaceFor } from "@/shared/constants";
 import { formatDateKigali, formatLongDateKigali, formatTimeKigali } from "@/shared/utils";
 import type { RegistrationRow, Role } from "@/shared/types";
 
@@ -25,13 +26,15 @@ export function ReportsView({
   date,
   rows,
   summary,
+  canEmail,
 }: {
   role: Role;
   date: string;
   rows: RegistrationRow[];
   summary: Record<string, number>;
+  canEmail: boolean;
 }) {
-  const base = role === "admin" ? "/admin" : "/dean";
+  const base = workspaceFor(role);
   const expected = rows.filter((r) => r.status === "pending" || r.status === "confirmed").length;
   const arrived = rows.filter((r) => r.attendance?.arrival_time).length;
   const onCampus = rows.filter((r) => r.attendance?.status === "on_campus").length;
@@ -46,7 +49,7 @@ export function ReportsView({
       <PageHeader
         eyebrow="Reports & exports"
         title="Visit reports"
-        description={`Attendance summary and printable register for ${formatLongDateKigali(date)}. Export to CSV, Excel or PDF for record keeping.`}
+        description={`Attendance summary and full downloadable register for ${formatLongDateKigali(date)}. Export to CSV, Word, Excel or PDF.`}
         actions={
           <>
             <AttendanceDatePicker date={date} />
@@ -76,7 +79,7 @@ export function ReportsView({
               <h2 className="text-[15px] font-semibold text-navy">Register preview</h2>
               <p className="text-xs text-muted">
                 {rows.length > 25
-                  ? `Showing the first 25 of ${rows.length} registrations. Export or print for the full register.`
+                  ? `Showing the first 25 of ${rows.length} registrations. Downloads and print include all ${rows.length} records.`
                   : `${rows.length} registration${rows.length === 1 ? "" : "s"} on this date.`}
               </p>
             </div>
@@ -141,6 +144,15 @@ export function ReportsView({
         </Card>
 
         <div className="space-y-5">
+          {canEmail ? (
+            <Card className="p-5">
+              <h2 className="text-[15px] font-semibold text-navy">Email attendance report</h2>
+              <p className="mb-4 mt-1 text-xs text-muted">
+                Send the complete register for this date as a CSV attachment.
+              </p>
+              <ReportEmailForm date={date} />
+            </Card>
+          ) : null}
           <Card className="p-5">
             <h2 className="text-[15px] font-semibold text-navy">All-time status summary</h2>
             <p className="mt-0.5 text-xs text-muted">Every registration in the system.</p>

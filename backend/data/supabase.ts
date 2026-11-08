@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { subDays } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { createSupabaseAdminClient } from "@/backend/supabase/server";
@@ -44,10 +45,14 @@ import type {
   StaffInput,
   VisitDayInput,
 } from "@/shared/validation/schemas";
-import { DEFAULT_ROLE_PERMISSIONS } from "@/shared/constants";
+import { DEFAULT_ROLE_PERMISSIONS, PERMISSION_KEYS } from "@/shared/constants";
 import { computePermissions } from "@/backend/auth/permissions";
 
 const SELECT = `*, visitor:visitors!inner(*), student:students!inner(*), visit_day:visit_days!inner(*), attendance(*)`;
+
+function isPermissionKey(permission: string): permission is PermissionKey {
+  return PERMISSION_KEYS.some((key) => key === permission);
+}
 
 function admin() {
   return createSupabaseAdminClient();
@@ -76,14 +81,20 @@ function normalizeProfile(raw: any): Profile {
 }
 
 async function fetchAllForDate(date: string): Promise<RegistrationRow[]> {
-  const { data, error } = await admin()
-    .from("registrations")
-    .select(SELECT)
-    .eq("visit_days.visit_date", date)
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(normalizeRow);
+  const pageSize = 1000;
+  const rows: RegistrationRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await admin()
+      .from("registrations")
+      .select(SELECT)
+      .eq("visit_days.visit_date", date)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []).map(normalizeRow);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -179,7 +190,6 @@ async function upsertVisitor(input: RegistrationInput): Promise<string> {
       .from("visitors")
       .update({
         email: input.email || null,
-        national_id: input.nationalId || null,
         relationship: input.relationship,
         updated_at: nowIso(),
       })
@@ -193,7 +203,7 @@ async function upsertVisitor(input: RegistrationInput): Promise<string> {
       full_name: input.fullName,
       phone,
       email: input.email || null,
-      national_id: input.nationalId || null,
+      national_id: null,
       relationship: input.relationship,
     })
     .select("id")
@@ -204,12 +214,15 @@ async function upsertVisitor(input: RegistrationInput): Promise<string> {
 
 async function upsertStudent(input: RegistrationInput): Promise<string> {
   const client = admin();
-  const { data: existing } = await client
-    .from("students")
-    .select("id")
-    .ilike("registration_number", input.studentRegistrationNumber)
-    .limit(1)
-    .maybeSingle();
+  let lookup = client.from("students").select("id").limit(1);
+  lookup = input.studentRegistrationNumber
+    ? lookup.ilike("registration_number", input.studentRegistrationNumber)
+    : lookup
+        .ilike("full_name", input.studentFullName)
+        .eq("trade", input.trade)
+        .eq("level", input.level)
+        .ilike("class_name", input.className);
+  const { data: existing } = await lookup.maybeSingle();
 
   if (existing?.id) {
     await client
@@ -228,7 +241,7 @@ async function upsertStudent(input: RegistrationInput): Promise<string> {
   const { data, error } = await client
     .from("students")
     .insert({
-      registration_number: input.studentRegistrationNumber.toUpperCase(),
+      registration_number: input.studentRegistrationNumber.toUpperCase() || `AUTO-${randomUUID()}`,
       full_name: input.studentFullName,
       trade: input.trade,
       level: input.level,
@@ -320,10 +333,15 @@ export async function createRegistration(
   const since = subDays(new Date(), 1).toISOString();
   const { data: visitors } = await client.from("visitors").select("id").eq("phone", phone);
   const visitorIds = (visitors ?? []).map((v: any) => v.id);
-  const { data: students } = await client
-    .from("students")
-    .select("id")
-    .ilike("registration_number", input.studentRegistrationNumber);
+  let studentQuery = client.from("students").select("id");
+  studentQuery = input.studentRegistrationNumber
+    ? studentQuery.ilike("registration_number", input.studentRegistrationNumber)
+    : studentQuery
+        .ilike("full_name", input.studentFullName)
+        .eq("trade", input.trade)
+        .eq("level", input.level)
+        .ilike("class_name", input.className);
+  const { data: students } = await studentQuery;
   const studentIds = (students ?? []).map((s: any) => s.id);
 
   if (visitorIds.length && studentIds.length) {
@@ -394,7 +412,7 @@ export async function createRegistration(
 
   await notifyDeans(
     "New visit registration received",
-    `${input.fullName} registered to visit ${input.studentFullName} (${input.studentRegistrationNumber}) on ${formatDateKigali(
+    `${input.fullName} registered to visit ${input.studentFullName} on ${formatDateKigali(
       visitDay.visit_date,
       "dd MMM yyyy",
     )}. Reference: ${reference}. Submitted ${formatDateKigali(new Date(), "dd MMM yyyy, HH:mm")}.`,
@@ -546,36 +564,45 @@ export async function updateRegistration(
   const current = await getRegistrationById(id);
   if (!current) throw new Error("Registration not found.");
   const client = admin();
-  await client
+  const visitorUpdate: Record<string, string | null> = {
+    full_name: input.full_name,
+    phone: normalizePhone(input.phone),
+    email: input.email || null,
+    relationship: input.relationship,
+    updated_at: nowIso(),
+  };
+  if (input.national_id !== undefined) visitorUpdate.national_id = input.national_id || null;
+  const { error: visitorError } = await client
     .from("visitors")
-    .update({
-      full_name: input.full_name,
-      phone: normalizePhone(input.phone),
-      email: input.email || null,
-      national_id: input.national_id || null,
-      relationship: input.relationship,
-      updated_at: nowIso(),
-    })
+    .update(visitorUpdate)
     .eq("id", current.visitor_id);
-  await client
+  if (visitorError) throw new Error(visitorError.message);
+
+  const studentUpdate: Record<string, string | null> = {
+    full_name: input.student_full_name,
+    trade: input.trade,
+    level: input.level,
+    class_name: input.class_name,
+    updated_at: nowIso(),
+  };
+  if (input.registration_number !== undefined) {
+    studentUpdate.registration_number = input.registration_number.toUpperCase();
+  }
+  const { error: studentError } = await client
     .from("students")
-    .update({
-      full_name: input.student_full_name,
-      registration_number: input.registration_number.toUpperCase(),
-      trade: input.trade,
-      level: input.level,
-      class_name: input.class_name,
-      updated_at: nowIso(),
-    })
+    .update(studentUpdate)
     .eq("id", current.student_id);
+  if (studentError) throw new Error(studentError.message);
+
+  const registrationUpdate: Record<string, string | null> = {
+    message: input.message || null,
+    status: input.status,
+    updated_at: nowIso(),
+  };
+  if (input.purpose !== undefined) registrationUpdate.purpose = input.purpose;
   const { error } = await client
     .from("registrations")
-    .update({
-      purpose: input.purpose,
-      message: input.message || null,
-      status: input.status,
-      updated_at: nowIso(),
-    })
+    .update(registrationUpdate)
     .eq("id", id);
   if (error) throw new Error(error.message);
   await logAudit(actorId, "registration.updated", "registration", id, `Updated ${current.reference_code}`);
@@ -1006,7 +1033,7 @@ export async function updateStaffProfile(
   if (error) throw new Error(error.message);
 }
 
-export async function updateStaffRole(id: string, roleKey: Role): Promise<void> {
+export async function updateStaffRole(id: string, roleKey: string): Promise<void> {
   const target = await getProfileById(id);
   if (!target) throw new Error("Staff member not found.");
   const role = await getRole(roleKey);
@@ -1141,7 +1168,9 @@ export async function listRolePermissions(roleKey: string): Promise<PermissionKe
     .select("permission_key")
     .eq("role_key", roleKey);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((entry: any) => entry.permission_key);
+  return (data ?? [])
+    .map((entry: any) => String(entry.permission_key))
+    .filter(isPermissionKey);
 }
 
 export async function listRolePermissionMap(): Promise<Record<string, PermissionKey[]>> {
@@ -1149,6 +1178,7 @@ export async function listRolePermissionMap(): Promise<Record<string, Permission
   if (error) throw new Error(error.message);
   const map: Record<string, PermissionKey[]> = {};
   for (const entry of (data ?? []) as { role_key: string; permission_key: string }[]) {
+    if (!isPermissionKey(entry.permission_key)) continue;
     map[entry.role_key] ??= [];
     map[entry.role_key].push(entry.permission_key);
   }
@@ -1181,10 +1211,12 @@ export async function getUserPermissionOverrides(userId: string): Promise<UserPe
     .select("permission_key, allowed")
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((entry: any) => ({
-    permission_key: entry.permission_key,
-    allowed: Boolean(entry.allowed),
-  }));
+  return (data ?? []).flatMap((entry: any) => {
+    const permissionKey = String(entry.permission_key);
+    return isPermissionKey(permissionKey)
+      ? [{ permission_key: permissionKey, allowed: Boolean(entry.allowed) }]
+      : [];
+  });
 }
 
 export async function setUserPermissionOverrides(

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -22,15 +21,16 @@ import { Input } from "@/frontend/components/ui/input";
 import { Label } from "@/frontend/components/ui/label";
 import { Select } from "@/frontend/components/ui/select";
 import { Textarea } from "@/frontend/components/ui/textarea";
-import { submitRegistrationAction } from "@/backend/actions/public";
 import {
   registrationSchema,
-  type ActionState,
+  type RegistrationFormValues,
   type RegistrationInput,
 } from "@/shared/validation/schemas";
-import { LEVELS, PURPOSES, RELATIONSHIPS, TRADES } from "@/shared/constants";
+import { LEVELS, RELATIONSHIPS, TRADES } from "@/shared/constants";
 import { cn, formatDateKigali } from "@/shared/utils";
 import type { VisitDay } from "@/shared/types";
+import { enqueuePublicRegistration } from "@/frontend/offline/attendance-queue";
+import { OfflineQueuePanel } from "@/frontend/components/attendance/offline-queue-panel";
 
 function Field({
   label,
@@ -96,22 +96,21 @@ function SectionHeading({
 
 export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
   const router = useRouter();
-  const [state, dispatch, pending] = useActionState<ActionState | undefined, FormData>(
-    submitRegistrationAction,
-    undefined,
-  );
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const websiteTrap = useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
-  } = useForm<RegistrationInput>({
+  } = useForm<RegistrationFormValues, unknown, RegistrationInput>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
       fullName: "",
       phone: "",
       email: "",
-      nationalId: "",
       relationship: "parent",
       studentFullName: "",
       studentRegistrationNumber: "",
@@ -119,45 +118,81 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
       level: "L3",
       className: "",
       visitDayId: visitDays[0]?.id ?? "",
-      purpose: "academic",
       message: "",
     },
   });
 
-  useEffect(() => {
-    if (!state) return;
-    if (state.ok) {
-      const reference = String(state.data?.reference ?? "");
-      toast.success("Registration submitted successfully.");
-      if (reference) router.push(`/registration-success/${reference}`);
-    } else {
-      toast.error(state.message);
+  async function onSubmit(values: RegistrationInput) {
+    setServerError("");
+    if (websiteTrap.current?.value) {
+      websiteTrap.current.value = "";
+      reset();
+      return;
     }
-  }, [state, router]);
 
-  function onSubmit(values: RegistrationInput) {
-    const formData = new FormData();
-    Object.entries(values).forEach(([key, value]) => {
-      formData.append(key, value === undefined || value === null ? "" : String(value));
-    });
-    formData.append("website", "");
-    dispatch(formData);
+    const operationId = crypto.randomUUID();
+    const saveOffline = async () => {
+      await enqueuePublicRegistration(values, operationId);
+      reset();
+      toast.success("Saved on this device. It will be submitted when the internet returns.");
+    };
+
+    setSubmitting(true);
+    try {
+      if (!navigator.onLine) {
+        await saveOffline();
+        return;
+      }
+
+      let response: Response;
+      try {
+        response = await fetch("/api/public-registration", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            type: "public_registration",
+            operationId,
+            input: values,
+            website: websiteTrap.current?.value ?? "",
+          }),
+        });
+      } catch {
+        await saveOffline();
+        return;
+      }
+
+      const result = await response.json() as { error?: string; reference?: string };
+      if (!response.ok) {
+        setServerError(result.error ?? "Could not submit the registration.");
+        return;
+      }
+      if (result.reference) {
+        toast.success("Registration submitted successfully.");
+        router.push(`/registration-success/${encodeURIComponent(result.reference)}`);
+      } else {
+        reset();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not submit the registration.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  const serverFieldErrors = state?.fieldErrors ?? {};
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-7" noValidate>
-      {state && !state.ok ? (
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-7" noValidate>
+      {serverError ? (
         <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <p>{state.message}</p>
+          <p>{serverError}</p>
         </div>
       ) : null}
 
       <input
         type="text"
         name="website"
+        ref={websiteTrap}
         tabIndex={-1}
         autoComplete="off"
         aria-hidden="true"
@@ -176,14 +211,14 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Full name"
             htmlFor="fullName"
             required
-            error={errors.fullName?.message ?? serverFieldErrors.fullName}
+            error={errors.fullName?.message}
             className="sm:col-span-2"
           >
             <Input
               id="fullName"
               placeholder="e.g. Jean Claude Habimana"
               autoComplete="name"
-              invalid={Boolean(errors.fullName ?? serverFieldErrors.fullName)}
+              invalid={Boolean(errors.fullName)}
               {...register("fullName")}
             />
           </Field>
@@ -192,7 +227,7 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Phone number"
             htmlFor="phone"
             required
-            error={errors.phone?.message ?? serverFieldErrors.phone}
+            error={errors.phone?.message}
             hint="Use a valid Rwandan number. You will need it to check your registration."
           >
             <Input
@@ -201,7 +236,7 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
               inputMode="tel"
               placeholder="0788 123 456"
               autoComplete="tel"
-              invalid={Boolean(errors.phone ?? serverFieldErrors.phone)}
+              invalid={Boolean(errors.phone)}
               {...register("phone")}
             />
           </Field>
@@ -209,30 +244,15 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
           <Field
             label="Email address"
             htmlFor="email"
-            error={errors.email?.message ?? serverFieldErrors.email}
+            error={errors.email?.message}
           >
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
-              invalid={Boolean(errors.email ?? serverFieldErrors.email)}
+              invalid={Boolean(errors.email)}
               {...register("email")}
-            />
-          </Field>
-
-          <Field
-            label="National ID number"
-            htmlFor="nationalId"
-            error={errors.nationalId?.message ?? serverFieldErrors.nationalId}
-            hint="16 digits, if available."
-          >
-            <Input
-              id="nationalId"
-              inputMode="numeric"
-              placeholder="1 1990 8 1234567 1 23"
-              invalid={Boolean(errors.nationalId ?? serverFieldErrors.nationalId)}
-              {...register("nationalId")}
             />
           </Field>
 
@@ -240,11 +260,11 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Relationship to student"
             htmlFor="relationship"
             required
-            error={errors.relationship?.message ?? serverFieldErrors.relationship}
+            error={errors.relationship?.message}
           >
             <Select
               id="relationship"
-              invalid={Boolean(errors.relationship ?? serverFieldErrors.relationship)}
+              invalid={Boolean(errors.relationship)}
               {...register("relationship")}
             >
               {RELATIONSHIPS.map((option) => (
@@ -269,35 +289,14 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Student full name"
             htmlFor="studentFullName"
             required
-            error={errors.studentFullName?.message ?? serverFieldErrors.studentFullName}
+            error={errors.studentFullName?.message}
             className="sm:col-span-2"
           >
             <Input
               id="studentFullName"
               placeholder="e.g. Aline Uwase"
-              invalid={Boolean(errors.studentFullName ?? serverFieldErrors.studentFullName)}
+              invalid={Boolean(errors.studentFullName)}
               {...register("studentFullName")}
-            />
-          </Field>
-
-          <Field
-            label="Student registration number"
-            htmlFor="studentRegistrationNumber"
-            required
-            error={
-              errors.studentRegistrationNumber?.message ??
-              serverFieldErrors.studentRegistrationNumber
-            }
-            hint="As written on the student card, e.g. SOD/L3/001."
-          >
-            <Input
-              id="studentRegistrationNumber"
-              placeholder="SOD/L3/001"
-              className="font-mono uppercase"
-              invalid={Boolean(
-                errors.studentRegistrationNumber ?? serverFieldErrors.studentRegistrationNumber,
-              )}
-              {...register("studentRegistrationNumber")}
             />
           </Field>
 
@@ -305,13 +304,13 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Student class"
             htmlFor="className"
             required
-            error={errors.className?.message ?? serverFieldErrors.className}
+            error={errors.className?.message}
             hint="e.g. SOD L3 A"
           >
             <Input
               id="className"
               placeholder="SOD L3 A"
-              invalid={Boolean(errors.className ?? serverFieldErrors.className)}
+              invalid={Boolean(errors.className)}
               {...register("className")}
             />
           </Field>
@@ -320,11 +319,11 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Trade"
             htmlFor="trade"
             required
-            error={errors.trade?.message ?? serverFieldErrors.trade}
+            error={errors.trade?.message}
           >
             <Select
               id="trade"
-              invalid={Boolean(errors.trade ?? serverFieldErrors.trade)}
+              invalid={Boolean(errors.trade)}
               {...register("trade")}
             >
               {TRADES.map((option) => (
@@ -339,11 +338,11 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             label="Level"
             htmlFor="level"
             required
-            error={errors.level?.message ?? serverFieldErrors.level}
+            error={errors.level?.message}
           >
             <Select
               id="level"
-              invalid={Boolean(errors.level ?? serverFieldErrors.level)}
+              invalid={Boolean(errors.level)}
               {...register("level")}
             >
               {LEVELS.map((option) => (
@@ -361,19 +360,19 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
           icon={CalendarDays}
           step="Step 3"
           title="Visit information"
-          description="Choose the visit day and tell us the purpose of your visit."
+          description="Choose the date of your visit."
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Visit date"
             htmlFor="visitDayId"
             required
-            error={errors.visitDayId?.message ?? serverFieldErrors.visitDayId}
+            error={errors.visitDayId?.message}
             className="sm:col-span-2"
           >
             <Select
               id="visitDayId"
-              invalid={Boolean(errors.visitDayId ?? serverFieldErrors.visitDayId)}
+              invalid={Boolean(errors.visitDayId)}
               {...register("visitDayId")}
             >
               {visitDays.map((day) => (
@@ -385,35 +384,16 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
           </Field>
 
           <Field
-            label="Purpose of visit"
-            htmlFor="purpose"
-            required
-            error={errors.purpose?.message ?? serverFieldErrors.purpose}
-          >
-            <Select
-              id="purpose"
-              invalid={Boolean(errors.purpose ?? serverFieldErrors.purpose)}
-              {...register("purpose")}
-            >
-              {PURPOSES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <Field
             label="Additional message"
             htmlFor="message"
-            error={errors.message?.message ?? serverFieldErrors.message}
+            error={errors.message?.message}
             className="sm:col-span-2"
             hint="Optional. Share any information the school should know before your visit."
           >
             <Textarea
               id="message"
               placeholder="e.g. I would like to discuss my child's academic progress with the class teacher."
-              invalid={Boolean(errors.message ?? serverFieldErrors.message)}
+              invalid={Boolean(errors.message)}
               {...register("message")}
             />
           </Field>
@@ -428,9 +408,9 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
             Discipline will be notified automatically.
           </p>
         </div>
-        <Button type="submit" size="lg" disabled={pending} className="shrink-0">
-          {pending ? <Loader2 className="size-4 animate-spin" /> : <Send />}
-          {pending ? "Submitting…" : "Submit registration"}
+        <Button type="submit" size="lg" disabled={submitting} className="shrink-0">
+          {submitting ? <Loader2 className="size-4 animate-spin" /> : <Send />}
+          {submitting ? "Submitting…" : "Submit registration"}
         </Button>
       </div>
 
@@ -440,6 +420,8 @@ export function RegistrationForm({ visitDays }: { visitDays: VisitDay[] }) {
         <MessageSquareText className="size-3.5" />
         Secure submission
       </div>
-    </form>
+      </form>
+      <OfflineQueuePanel />
+    </div>
   );
 }

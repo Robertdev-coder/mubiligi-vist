@@ -30,7 +30,16 @@ export interface QueuedGone {
   lastError?: string;
 }
 
-export type AttendanceQueueItem = QueuedCheckIn | QueuedGone;
+export interface QueuedPublicRegistration {
+  type: "public_registration";
+  operationId: string;
+  input: RegistrationInput;
+  createdAt: string;
+  retryCount: number;
+  lastError?: string;
+}
+
+export type AttendanceQueueItem = QueuedCheckIn | QueuedGone | QueuedPublicRegistration;
 const DB_NAME = "mubiligi-visitday";
 const STORE = "attendance-queue";
 let openPromise: Promise<IDBDatabase> | undefined;
@@ -92,6 +101,22 @@ export async function enqueueCheckIn(
   return item;
 }
 
+export async function enqueuePublicRegistration(
+  input: RegistrationInput,
+  operationId = crypto.randomUUID(),
+): Promise<QueuedPublicRegistration> {
+  const item: QueuedPublicRegistration = {
+    type: "public_registration",
+    operationId,
+    input,
+    createdAt: new Date().toISOString(),
+    retryCount: 0,
+  };
+  await transaction("readwrite", (store) => store.put(item));
+  window.dispatchEvent(new Event("attendance-queue-updated"));
+  return item;
+}
+
 export async function enqueueGone(
   target: { registrationId?: string; registrationOperationId?: string },
   actorId: string,
@@ -128,13 +153,44 @@ export async function enqueueGone(
   window.dispatchEvent(new Event("attendance-queue-updated"));
 }
 
-export async function syncAttendanceQueue(actorId: string): Promise<void> {
+export async function syncAttendanceQueue(actorId?: string): Promise<void> {
   if (syncPromise) return syncPromise;
   syncPromise = (async () => {
     if (!navigator.onLine) return;
     const queue = await listAttendanceQueue();
     for (const item of queue) {
-      if (item.actorId !== actorId) continue;
+      if (item.type === "public_registration") {
+        try {
+          const response = await fetch("/api/public-registration", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(item),
+          });
+          if (response.ok) {
+            const result = await response.json() as { reference: string };
+            window.dispatchEvent(
+              new CustomEvent("registration-synced", { detail: { reference: result.reference } }),
+            );
+            await transaction("readwrite", (store) => store.delete(item.operationId));
+          } else {
+            const result = await response.json().catch(() => null) as { error?: string } | null;
+            await transaction("readwrite", (store) =>
+              store.put({ ...item, retryCount: item.retryCount + 1, lastError: result?.error ?? "Synchronization failed." }),
+            );
+          }
+        } catch (error) {
+          await transaction("readwrite", (store) =>
+            store.put({
+              ...item,
+              retryCount: item.retryCount + 1,
+              lastError: error instanceof Error ? error.message : "Network error.",
+            }),
+          );
+          break;
+        }
+        continue;
+      }
+      if (!actorId || item.actorId !== actorId) continue;
       try {
         const response = await fetch("/api/offline-sync", {
           method: "POST",
@@ -166,4 +222,3 @@ export async function syncAttendanceQueue(actorId: string): Promise<void> {
   });
   return syncPromise;
 }
-

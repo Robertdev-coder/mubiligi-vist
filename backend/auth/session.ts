@@ -71,7 +71,7 @@ async function buildSession(profile: Profile | null): Promise<SessionUser | null
     id: profile.id,
     full_name: profile.full_name,
     email: profile.email,
-    role: profile.role_key,
+    role: profile.role,
     role_name: roleName,
     permissions,
     status: profile.status,
@@ -106,7 +106,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   }
 });
 
-export function dashboardFor(role: Role): string {
+export function dashboardFor(role: string): string {
   return role === "dean" ? "/dean" : "/admin";
 }
 

@@ -7,10 +7,9 @@ import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
 import { Label } from "@/frontend/components/ui/label";
 import { loginAction } from "@/backend/auth/actions";
-import { DEMO_CREDENTIALS } from "@/shared/constants";
 import type { ActionState } from "@/shared/validation/schemas";
 
-export function LoginForm({ showDemo = false }: { showDemo?: boolean }) {
+export function LoginForm() {
   const [state, formAction, pending] = useActionState<ActionState | undefined, FormData>(
     loginAction,
     undefined,
@@ -80,35 +79,6 @@ export function LoginForm({ showDemo = false }: { showDemo?: boolean }) {
         </Button>
       </form>
 
-      {showDemo ? (
-        <div className="rounded-xl border border-dashed border-line bg-surface/70 p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Development access
-          </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-            Local demo accounts (seeded). Use these only in development.
-          </p>
-          <div className="mt-3 space-y-2">
-            {DEMO_CREDENTIALS.map((credential) => (
-              <button
-                key={credential.email}
-                type="button"
-                onClick={() => {
-                  setEmail(credential.email);
-                  setPassword(credential.password);
-                }}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-white px-3 py-2 text-left text-[11px] transition-colors hover:border-primary/30 hover:bg-sky-soft/40"
-              >
-                <span>
-                  <span className="block font-semibold text-navy">{credential.role}</span>
-                  <span className="block font-mono text-slate-500">{credential.email}</span>
-                </span>
-                <span className="font-mono text-[10px] text-primary">Use →</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

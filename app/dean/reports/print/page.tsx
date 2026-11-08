@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/backend/auth/session";
 import { backend } from "@/backend/data";
-import { todayKigali } from "@/shared/utils";
+import { DEFAULT_VISIT_DATE } from "@/shared/constants";
 import { ErrorState } from "@/frontend/components/ui/error-state";
 import { PrintRegister } from "@/frontend/components/reports/print-register";
 
@@ -19,16 +19,16 @@ export default async function DeanPrintRegisterPage({
 }: {
   searchParams: SearchParams;
 }) {
-  await requirePermission("reports.print");
+  const user = await requirePermission("reports.print");
   const raw = await searchParams;
-  const date = pick(raw.date) ?? todayKigali();
+  const date = pick(raw.date) ?? DEFAULT_VISIT_DATE;
 
   try {
     const [rows, visitDay] = await Promise.all([
       backend.getReportRows(date),
       backend.getVisitDayByDate(date),
     ]);
-    return <PrintRegister role="dean" date={date} rows={rows} visitDay={visitDay} />;
+    return <PrintRegister role={user.role} date={date} rows={rows} visitDay={visitDay} />;
   } catch {
     return <ErrorState title="Could not build the print register" showHome={false} />;
   }

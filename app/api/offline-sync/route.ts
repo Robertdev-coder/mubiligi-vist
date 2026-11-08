@@ -31,16 +31,6 @@ const goneSchema = z
 const syncSchema = z.discriminatedUnion("type", [checkInSchema, goneSchema]);
 
 export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (
-    !user.permissions.includes("registrations.create") ||
-    !user.permissions.includes("attendance.create") ||
-    !user.permissions.includes("attendance.edit")
-  ) {
-    return NextResponse.json({ error: "You cannot synchronize attendance records." }, { status: 403 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -50,6 +40,15 @@ export async function POST(request: Request) {
   const parsed = syncSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid sync operation." }, { status: 400 });
+  }
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (
+    !user.permissions.includes("registrations.create") ||
+    !user.permissions.includes("attendance.create") ||
+    !user.permissions.includes("attendance.edit")
+  ) {
+    return NextResponse.json({ error: "You cannot synchronize attendance records." }, { status: 403 });
   }
   if (parsed.data.actorId !== user.id) {
     return NextResponse.json(

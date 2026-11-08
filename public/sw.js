@@ -1,6 +1,6 @@
 const CACHE = "mubiligi-visitday-v1";
 const OFFLINE_FALLBACK = "/offline.html";
-const REGISTER_PATH = "/admin/registrations/new";
+const REGISTER_PATHS = ["/admin/registrations/new", "/register"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -43,7 +43,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then(async (response) => {
-          if (response.ok && url.pathname === REGISTER_PATH) {
+          if (response.ok && REGISTER_PATHS.includes(url.pathname)) {
             const cache = await caches.open(CACHE);
             await cache.put(request, response.clone());
           }

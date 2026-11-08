@@ -19,13 +19,7 @@ import {
   type ActionState,
   type RegistrationUpdateInput,
 } from "@/shared/validation/schemas";
-import {
-  LEVELS,
-  PURPOSES,
-  REGISTRATION_STATUSES,
-  RELATIONSHIPS,
-  TRADES,
-} from "@/shared/constants";
+import { LEVELS, REGISTRATION_STATUSES, RELATIONSHIPS, TRADES } from "@/shared/constants";
 import { cn } from "@/shared/utils";
 import type { RegistrationRow } from "@/shared/types";
 
@@ -74,14 +68,11 @@ export function RegistrationEditForm({ registration }: { registration: Registrat
       full_name: registration.visitor.full_name,
       phone: registration.visitor.phone,
       email: registration.visitor.email ?? "",
-      national_id: registration.visitor.national_id ?? "",
       relationship: registration.visitor.relationship,
       student_full_name: registration.student.full_name,
-      registration_number: registration.student.registration_number,
       trade: registration.student.trade,
       level: registration.student.level,
       class_name: registration.student.class_name,
-      purpose: registration.purpose,
       message: registration.message ?? "",
       status: registration.status,
     },
@@ -156,18 +147,6 @@ export function RegistrationEditForm({ registration }: { registration: Registrat
                 <Input id="edit_email" type="email" invalid={Boolean(errors.email)} {...register("email")} />
               </Field>
               <Field
-                label="National ID"
-                htmlFor="edit_national_id"
-                error={errors.national_id?.message ?? serverErrors.national_id}
-              >
-                <Input
-                  id="edit_national_id"
-                  inputMode="numeric"
-                  invalid={Boolean(errors.national_id)}
-                  {...register("national_id")}
-                />
-              </Field>
-              <Field
                 label="Relationship"
                 htmlFor="edit_relationship"
                 error={errors.relationship?.message ?? serverErrors.relationship}
@@ -198,18 +177,6 @@ export function RegistrationEditForm({ registration }: { registration: Registrat
                   id="edit_student_full_name"
                   invalid={Boolean(errors.student_full_name)}
                   {...register("student_full_name")}
-                />
-              </Field>
-              <Field
-                label="Registration number"
-                htmlFor="edit_registration_number"
-                error={errors.registration_number?.message ?? serverErrors.registration_number}
-              >
-                <Input
-                  id="edit_registration_number"
-                  className="font-mono uppercase"
-                  invalid={Boolean(errors.registration_number)}
-                  {...register("registration_number")}
                 />
               </Field>
               <Field label="Class" htmlFor="edit_class_name" error={errors.class_name?.message ?? serverErrors.class_name}>
@@ -245,15 +212,6 @@ export function RegistrationEditForm({ registration }: { registration: Registrat
               Visit details
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Purpose" htmlFor="edit_purpose" error={errors.purpose?.message ?? serverErrors.purpose}>
-                <Select id="edit_purpose" invalid={Boolean(errors.purpose)} {...register("purpose")}>
-                  {PURPOSES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
               <Field label="Status" htmlFor="edit_status" error={errors.status?.message ?? serverErrors.status}>
                 <Select id="edit_status" invalid={Boolean(errors.status)} {...register("status")}>
                   {REGISTRATION_STATUSES.map((option) => (

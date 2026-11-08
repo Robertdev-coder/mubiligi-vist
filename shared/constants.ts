@@ -24,6 +24,8 @@ export const SCHOOL = {
   dean: "Dean of Discipline",
 } as const;
 
+export const DEFAULT_VISIT_DATE = "2027-11-08";
+
 export const RELATIONSHIPS: { value: Relationship; label: string; hint: string }[] = [
   { value: "parent", label: "Parent", hint: "Biological or adoptive parent" },
   { value: "guardian", label: "Guardian", hint: "Legally responsible guardian" },
@@ -151,7 +153,7 @@ export const PERMISSIONS: PermissionDef[] = [
     key: "reports.email",
     label: "Email reports",
     group: "Reports",
-    description: "Send reports to the Dean by email.",
+    description: "Send full attendance reports to an email address.",
   },
   {
     key: "users.view",
@@ -287,7 +289,7 @@ export const DEFAULT_ROLES: RoleRecord[] = [
   },
 ];
 
-export const ROLES: { value: Role; label: string }[] = DEFAULT_ROLES.map((role) => ({
+export const ROLES: { value: string; label: string }[] = DEFAULT_ROLES.map((role) => ({
   value: role.key,
   label: role.name,
 }));
@@ -317,6 +319,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     "attendance.view",
     "attendance.create",
     "attendance.edit",
+    "reports.view",
+    "reports.export",
+    "reports.print",
+    "reports.email",
   ],
   registration_staff: [
     "dashboard.view",
@@ -477,7 +483,8 @@ export function navItemsFor(
   role: Role,
 ): (NavItem & { href: string })[] {
   const base = workspaceFor(role);
-  return NAV_ITEMS.filter((item) => permissions.includes(item.permission)).map((item) => ({
+  const visibleItems = NAV_ITEMS.filter((item) => permissions.includes(item.permission));
+  return visibleItems.map((item) => ({
     ...item,
     href: `${base}${item.path}`,
   }));
@@ -486,8 +493,3 @@ export function navItemsFor(
 export function can(permissions: PermissionKey[], permission: PermissionKey): boolean {
   return permissions.includes(permission);
 }
-
-export const DEMO_CREDENTIALS = [
-  { role: "Administrator", email: "admin@mubiligi.rw", password: "Admin@12345" },
-  { role: "Dean of Discipline", email: "dean@mubiligi.rw", password: "Dean@12345" },
-];

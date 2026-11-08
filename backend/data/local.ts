@@ -35,11 +35,20 @@ import type {
   Visitor,
 } from "@/shared/types";
 import type { PrefectSignupInput, RegistrationInput, RegistrationUpdateInput, StaffInput, VisitDayInput } from "@/shared/validation/schemas";
-import { DEFAULT_ROLE_PERMISSIONS, PURPOSE_LABEL, REGISTRATION_STATUS_LABEL } from "@/shared/constants";
+import {
+  DEFAULT_ROLE_PERMISSIONS,
+  PERMISSION_KEYS,
+  PURPOSE_LABEL,
+  REGISTRATION_STATUS_LABEL,
+} from "@/shared/constants";
 import { computePermissions } from "@/backend/auth/permissions";
 import { formatDateKigali } from "@/shared/utils";
 
 type RawRow = Record<string, string | number | null>;
+
+function isPermissionKey(permission: string): permission is PermissionKey {
+  return PERMISSION_KEYS.some((key) => key === permission);
+}
 
 const BASE_SELECT = `
 SELECT
@@ -276,10 +285,8 @@ function upsertVisitor(input: RegistrationInput): string {
   const now = nowIso();
   if (existing) {
     run(
-      `UPDATE visitors SET email = COALESCE(?, email), national_id = COALESCE(?, national_id),
-       relationship = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE visitors SET email = COALESCE(?, email), relationship = ?, updated_at = ? WHERE id = ?`,
       input.email || null,
-      input.nationalId || null,
       input.relationship,
       now,
       String(existing.id),
@@ -294,7 +301,7 @@ function upsertVisitor(input: RegistrationInput): string {
     input.fullName,
     phone,
     input.email || null,
-    input.nationalId || null,
+    null,
     input.relationship,
     now,
     now,
@@ -303,10 +310,19 @@ function upsertVisitor(input: RegistrationInput): string {
 }
 
 function upsertStudent(input: RegistrationInput): string {
-  const existing = row<RawRow>(
-    "SELECT * FROM students WHERE lower(registration_number) = lower(?)",
-    input.studentRegistrationNumber,
-  );
+  const existing = input.studentRegistrationNumber
+    ? row<RawRow>(
+        "SELECT * FROM students WHERE lower(registration_number) = lower(?)",
+        input.studentRegistrationNumber,
+      )
+    : row<RawRow>(
+        `SELECT * FROM students
+         WHERE lower(full_name) = lower(?) AND trade = ? AND level = ? AND lower(class_name) = lower(?)`,
+        input.studentFullName,
+        input.trade,
+        input.level,
+        input.className,
+      );
   const now = nowIso();
   if (existing) {
     run(
@@ -325,7 +341,7 @@ function upsertStudent(input: RegistrationInput): string {
     `INSERT INTO students (id, registration_number, full_name, trade, level, class_name, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
-    input.studentRegistrationNumber.toUpperCase(),
+    input.studentRegistrationNumber.toUpperCase() || `AUTO-${id}`,
     input.studentFullName,
     input.trade,
     input.level,
@@ -394,10 +410,14 @@ export async function createRegistration(
     `SELECT r.id, r.reference_code FROM registrations r
      JOIN visitors v ON v.id = r.visitor_id
      JOIN students s ON s.id = r.student_id
-     WHERE v.phone = ? AND lower(s.registration_number) = lower(?)
+     WHERE v.phone = ? AND lower(s.full_name) = lower(?)
+       AND s.trade = ? AND s.level = ? AND lower(s.class_name) = lower(?)
        AND r.visit_day_id = ? AND r.status != 'cancelled' AND r.created_at >= ?`,
     phone,
-    input.studentRegistrationNumber,
+    input.studentFullName,
+    input.trade,
+    input.level,
+    input.className,
     input.visitDayId,
     since,
   );
@@ -456,7 +476,7 @@ export async function createRegistration(
 
   notifyDeans(
     "New visit registration received",
-    `${input.fullName} registered to visit ${input.studentFullName} (${input.studentRegistrationNumber}) on ${formatDateKigali(
+    `${input.fullName} registered to visit ${input.studentFullName} on ${formatDateKigali(
       visitDay.visit_date,
       "dd MMM yyyy",
     )}. Reference: ${reference}. Submitted ${formatDateKigali(now, "dd MMM yyyy, HH:mm")}.`,
@@ -617,19 +637,21 @@ export async function updateRegistration(
   if (!current) throw new Error("Registration not found.");
   const now = nowIso();
   run(
-    `UPDATE visitors SET full_name = ?, phone = ?, email = ?, national_id = ?, relationship = ?, updated_at = ? WHERE id = ?`,
+    `UPDATE visitors SET full_name = ?, phone = ?, email = ?, national_id = COALESCE(?, national_id),
+     relationship = ?, updated_at = ? WHERE id = ?`,
     input.full_name,
     normalizePhone(input.phone),
     input.email || null,
-    input.national_id || null,
+    input.national_id ?? null,
     input.relationship,
     now,
     current.visitor_id,
   );
   run(
-    `UPDATE students SET full_name = ?, registration_number = ?, trade = ?, level = ?, class_name = ?, updated_at = ? WHERE id = ?`,
+    `UPDATE students SET full_name = ?, registration_number = COALESCE(?, registration_number),
+     trade = ?, level = ?, class_name = ?, updated_at = ? WHERE id = ?`,
     input.student_full_name,
-    input.registration_number.toUpperCase(),
+    input.registration_number?.toUpperCase() ?? null,
     input.trade,
     input.level,
     input.class_name,
@@ -637,8 +659,8 @@ export async function updateRegistration(
     current.student_id,
   );
   run(
-    `UPDATE registrations SET purpose = ?, message = ?, status = ?, updated_at = ? WHERE id = ?`,
-    input.purpose,
+    `UPDATE registrations SET purpose = COALESCE(?, purpose), message = ?, status = ?, updated_at = ? WHERE id = ?`,
+    input.purpose ?? null,
     input.message || null,
     input.status,
     now,
@@ -701,9 +723,19 @@ function ensureAttendance(registrationId: string): Attendance {
       id: String(existing.id),
       registration_id: String(existing.registration_id),
       arrival_time: (existing.arrival_time as string | null) ?? null,
+      arrival_device_timezone: (existing.arrival_device_timezone as string | null) ?? null,
+      arrival_source: existing.arrival_source === "device" ? "device" : "server",
       departure_time: (existing.departure_time as string | null) ?? null,
+      departure_device_timezone: (existing.departure_device_timezone as string | null) ?? null,
+      departure_source:
+        existing.departure_source === "device" || existing.departure_source === "server"
+          ? existing.departure_source
+          : null,
+      sync_confirmed_at: (existing.sync_confirmed_at as string | null) ?? null,
       status: existing.status as AttendanceStatus,
       recorded_by: (existing.recorded_by as string | null) ?? null,
+      departure_recorded_by: (existing.departure_recorded_by as string | null) ?? null,
+      departure_operation_id: (existing.departure_operation_id as string | null) ?? null,
       created_at: String(existing.created_at),
       updated_at: String(existing.updated_at),
     };
@@ -721,9 +753,16 @@ function ensureAttendance(registrationId: string): Attendance {
     id,
     registration_id: registrationId,
     arrival_time: null,
+    arrival_device_timezone: null,
+    arrival_source: "server",
     departure_time: null,
+    departure_device_timezone: null,
+    departure_source: null,
+    sync_confirmed_at: null,
     status: "expected",
     recorded_by: null,
+    departure_recorded_by: null,
+    departure_operation_id: null,
     created_at: now,
     updated_at: now,
   };
@@ -1086,7 +1125,7 @@ export async function verifyLocalCredentials(
     id: profile.id,
     full_name: profile.full_name,
     email: profile.email,
-    role: profile.role_key,
+    role: profile.role,
     role_name: roleName,
     permissions,
     status: profile.status,
@@ -1155,7 +1194,7 @@ export async function updateStaffProfile(
   );
 }
 
-export async function updateStaffRole(id: string, roleKey: Role): Promise<void> {
+export async function updateStaffRole(id: string, roleKey: string): Promise<void> {
   const target = await getProfileById(id);
   if (!target) throw new Error("Staff member not found.");
   const role = await getRole(roleKey);
@@ -1288,7 +1327,9 @@ export async function listRolePermissions(roleKey: string): Promise<PermissionKe
   return rows<{ permission_key: string }>(
     "SELECT permission_key FROM role_permissions WHERE role_key = ?",
     roleKey,
-  ).map((entry) => entry.permission_key);
+  )
+    .map((entry) => entry.permission_key)
+    .filter(isPermissionKey);
 }
 
 export async function listRolePermissionMap(): Promise<Record<string, PermissionKey[]>> {
@@ -1297,6 +1338,7 @@ export async function listRolePermissionMap(): Promise<Record<string, Permission
   );
   const map: Record<string, PermissionKey[]> = {};
   for (const entry of data) {
+    if (!isPermissionKey(entry.permission_key)) continue;
     map[entry.role_key] ??= [];
     map[entry.role_key].push(entry.permission_key);
   }
@@ -1321,7 +1363,11 @@ export async function getUserPermissionOverrides(userId: string): Promise<UserPe
   return rows<{ permission_key: string; allowed: number }>(
     "SELECT permission_key, allowed FROM user_permissions WHERE user_id = ?",
     userId,
-  ).map((entry) => ({ permission_key: entry.permission_key, allowed: Number(entry.allowed) === 1 }));
+  ).flatMap((entry) =>
+    isPermissionKey(entry.permission_key)
+      ? [{ permission_key: entry.permission_key, allowed: Number(entry.allowed) === 1 }]
+      : [],
+  );
 }
 
 export async function setUserPermissionOverrides(

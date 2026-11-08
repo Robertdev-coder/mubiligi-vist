@@ -189,7 +189,7 @@ export function RegistrationsView({
                       <td className="px-4 py-3.5">
                         <p className="font-medium text-slate-700">{row.student.full_name}</p>
                         <p className="text-[11px] text-slate-400">
-                          {row.student.registration_number} · {row.student.class_name}
+                          {row.student.class_name}
                         </p>
                       </td>
                       <td className="px-4 py-3.5">

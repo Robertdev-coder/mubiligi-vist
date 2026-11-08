@@ -2,11 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 import { PrintButton } from "@/frontend/components/ui/print-button";
-import {
-  PURPOSE_LABEL,
-  SCHOOL,
-  TRADE_LABEL,
-} from "@/shared/constants";
+import { SCHOOL, TRADE_LABEL, workspaceFor } from "@/shared/constants";
 import {
   formatDateKigali,
   formatLongDateKigali,
@@ -25,7 +21,7 @@ export function PrintRegister({
   rows: RegistrationRow[];
   visitDay: VisitDay | null;
 }) {
-  const base = role === "admin" ? "/admin" : "/dean";
+  const base = workspaceFor(role);
   const expected = rows.filter((r) => r.status === "pending" || r.status === "confirmed").length;
   const arrived = rows.filter((r) => r.attendance?.arrival_time).length;
   const completed = rows.filter(
@@ -86,7 +82,6 @@ export function PrintRegister({
               <th className="border border-slate-300 px-2 py-2 text-left">Phone</th>
               <th className="border border-slate-300 px-2 py-2 text-left">Student</th>
               <th className="border border-slate-300 px-2 py-2 text-left">Trade / Level</th>
-              <th className="border border-slate-300 px-2 py-2 text-left">Purpose</th>
               <th className="border border-slate-300 px-2 py-2 text-left">Arrival</th>
               <th className="border border-slate-300 px-2 py-2 text-left">Departure</th>
               <th className="border border-slate-300 px-2 py-2 text-left">Signature</th>
@@ -96,7 +91,7 @@ export function PrintRegister({
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={11} className="border border-slate-300 px-3 py-8 text-center text-slate-500">
+                <td colSpan={10} className="border border-slate-300 px-3 py-8 text-center text-slate-500">
                   No registrations recorded for this visit date.
                 </td>
               </tr>
@@ -113,15 +108,12 @@ export function PrintRegister({
                   <td className="border border-slate-300 px-2 py-1.5">{row.visitor.phone}</td>
                   <td className="border border-slate-300 px-2 py-1.5">
                     {row.student.full_name}
-                    <br />
-                    <span className="text-[9px] text-slate-500">{row.student.registration_number}</span>
                   </td>
                   <td className="border border-slate-300 px-2 py-1.5">
                     {TRADE_LABEL[row.student.trade]} · {row.student.level}
                     <br />
                     <span className="text-[9px] text-slate-500">{row.student.class_name}</span>
                   </td>
-                  <td className="border border-slate-300 px-2 py-1.5">{PURPOSE_LABEL[row.purpose]}</td>
                   <td className="border border-slate-300 px-2 py-1.5">
                     {row.attendance?.arrival_time ? formatTimeKigali(row.attendance.arrival_time) : ""}
                   </td>

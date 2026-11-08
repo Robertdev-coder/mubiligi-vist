@@ -11,7 +11,6 @@ import {
   MapPin,
   Phone,
   Printer,
-  ShieldAlert,
   Trash2,
   UserRound,
   XCircle,
@@ -37,11 +36,7 @@ import {
   formatLongDateKigali,
   formatTimeKigali,
 } from "@/shared/utils";
-import {
-  PURPOSE_LABEL,
-  RELATIONSHIP_LABEL,
-  TRADE_DESCRIPTION,
-} from "@/shared/constants";
+import { RELATIONSHIP_LABEL, TRADE_DESCRIPTION, workspaceFor } from "@/shared/constants";
 import type { RegistrationRow, Role } from "@/shared/types";
 
 function Detail({
@@ -81,7 +76,7 @@ export function RegistrationDetail({
   role: Role;
   registration: RegistrationRow;
 }) {
-  const base = role === "admin" ? "/admin" : "/dean";
+  const base = workspaceFor(role);
   const attendance = registration.attendance;
   const arrived = Boolean(attendance?.arrival_time);
   const departed = Boolean(attendance?.departure_time);
@@ -91,7 +86,7 @@ export function RegistrationDetail({
       <PageHeader
         eyebrow={registration.reference_code}
         title={registration.visitor.full_name}
-        description={`Visiting ${registration.student.full_name} · ${registration.student.registration_number} on ${formatLongDateKigali(registration.visit_day.visit_date)}.`}
+        description={`Visiting ${registration.student.full_name} on ${formatLongDateKigali(registration.visit_day.visit_date)}.`}
         actions={
           <>
             <Link href={`${base}/registrations`}>
@@ -148,7 +143,6 @@ export function RegistrationDetail({
                 }
                 icon={Mail}
               />
-              <Detail label="National ID" value={registration.visitor.national_id} icon={ShieldAlert} mono />
             </div>
           </Card>
 
@@ -159,7 +153,6 @@ export function RegistrationDetail({
             </div>
             <div className="mt-4 grid gap-5 sm:grid-cols-2">
               <Detail label="Student name" value={registration.student.full_name} />
-              <Detail label="Registration number" value={registration.student.registration_number} mono />
               <Detail
                 label="Trade"
                 value={`${registration.student.trade} — ${TRADE_DESCRIPTION[registration.student.trade]}`}
@@ -183,7 +176,6 @@ export function RegistrationDetail({
                 icon={CalendarClock}
               />
               <Detail label="Visit title" value={registration.visit_day.title} />
-              <Detail label="Purpose" value={PURPOSE_LABEL[registration.purpose]} />
               <Detail
                 label="Registration window"
                 value={`${formatDateTimeKigali(registration.visit_day.registration_open)} → ${formatDateTimeKigali(registration.visit_day.registration_close)}`}

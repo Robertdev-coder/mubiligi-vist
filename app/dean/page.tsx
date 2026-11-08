@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/backend/auth/session";
 import { backend } from "@/backend/data";
-import { todayKigali } from "@/shared/utils";
+import { DEFAULT_VISIT_DATE } from "@/shared/constants";
 import { DashboardOverview } from "@/frontend/components/dashboard/overview";
 import { ErrorState } from "@/frontend/components/ui/error-state";
 import type { DashboardData } from "@/shared/types";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DeanDashboardPage() {
   const user = await requirePermission("dashboard.view");
-  const date = todayKigali();
+  const date = DEFAULT_VISIT_DATE;
 
   let data: DashboardData;
   try {

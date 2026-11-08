@@ -36,7 +36,6 @@ export const registrationSchema = z.object({
       message: "Enter a valid Rwandan phone number (e.g. 0788 123 456)",
     }),
   email: optionalEmail,
-  nationalId: optionalNationalId,
   relationship: z.enum(["parent", "guardian", "relative", "other"], {
     message: "Select the visitor relationship",
   }),
@@ -49,9 +48,10 @@ export const registrationSchema = z.object({
   studentRegistrationNumber: z
     .string()
     .trim()
-    .min(3, "Student registration number is required")
     .max(40, "Registration number is too long")
-    .regex(/^[A-Za-z0-9/\-_.]+$/, "Use letters, numbers, / or - only"),
+    .regex(/^[A-Za-z0-9/\-_.]*$/, "Use letters, numbers, / or - only")
+    .optional()
+    .default(""),
   trade: z.enum(["SOD", "MMP", "CSA", "NIT"], { message: "Select the student trade" }),
   level: z.enum(["L3", "L4", "L5"], { message: "Select the student level" }),
   className: z
@@ -60,14 +60,15 @@ export const registrationSchema = z.object({
     .min(1, "Student class is required")
     .max(40, "Class name is too long"),
   visitDayId: z.string().trim().min(1, "Select a valid visit date"),
-  purpose: z.enum(
-    ["academic", "discipline", "financial", "welfare", "consultation", "other"],
-    { message: "Select the purpose of the visit" },
-  ),
+  purpose: z
+    .enum(["academic", "discipline", "financial", "welfare", "consultation", "other"])
+    .optional()
+    .default("consultation"),
   message: z.string().trim().max(1000, "Message must be 1000 characters or fewer").optional(),
 });
 
-export type RegistrationInput = z.infer<typeof registrationSchema>;
+export type RegistrationFormValues = z.input<typeof registrationSchema>;
+export type RegistrationInput = z.output<typeof registrationSchema>;
 
 export const lookupSchema = z.object({
   reference: z
@@ -81,6 +82,11 @@ export const lookupSchema = z.object({
     .trim()
     .min(9, "Enter the phone number used during registration")
     .max(16, "Invalid phone number"),
+});
+
+export const reportEmailSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address").max(254),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Select a valid report date"),
 });
 
 export const loginSchema = z.object({
@@ -201,11 +207,13 @@ export const registrationUpdateSchema = z.object({
   national_id: optionalNationalId,
   relationship: z.enum(["parent", "guardian", "relative", "other"]),
   student_full_name: z.string().trim().min(3, "Student name is required").max(120),
-  registration_number: z.string().trim().min(3, "Student registration number is required").max(40),
+  registration_number: z.string().trim().min(3, "Student registration number is required").max(40).optional(),
   trade: z.enum(["SOD", "MMP", "CSA", "NIT"]),
   level: z.enum(["L3", "L4", "L5"]),
   class_name: z.string().trim().min(1, "Class is required").max(40),
-  purpose: z.enum(["academic", "discipline", "financial", "welfare", "consultation", "other"]),
+  purpose: z
+    .enum(["academic", "discipline", "financial", "welfare", "consultation", "other"])
+    .optional(),
   message: z.string().trim().max(1000).optional(),
   status: z.enum(["pending", "confirmed", "cancelled", "completed"]),
 });

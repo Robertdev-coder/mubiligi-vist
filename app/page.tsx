@@ -18,10 +18,10 @@ export default async function HomePage() {
       <Card className="w-full max-w-xl overflow-hidden">
         <div className="bg-navy px-7 py-8 text-white sm:px-10">
           <Brand variant="light" />
-          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Internal school workspace</p>
+          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Visitor portal &amp; school workspace</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">MUBILIGI VISIT DAY</h1>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-sky-100/70">
-            Staff sign in to register parents as they arrive, track departures, and prepare official attendance reports.
+            Visitors can register for an open visit day. Staff can sign in to record arrivals, track departures, and prepare attendance reports.
           </p>
         </div>
         <div className="space-y-4 p-7 sm:p-10">
@@ -37,10 +37,20 @@ export default async function HomePage() {
               <p className="mt-1 text-xs text-muted">Attendance and student details are protected.</p>
             </div>
           </div>
-          <Link href="/login" className="block">
-            <Button className="w-full">
-              Staff sign in <ArrowRight />
-            </Button>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link href="/register" className="block">
+              <Button className="w-full">
+                Register a visit <ArrowRight />
+              </Button>
+            </Link>
+            <Link href="/login" className="block">
+              <Button variant="outline" className="w-full">
+                Staff sign in
+              </Button>
+            </Link>
+          </div>
+          <Link href="/check-registration" className="flex items-center justify-center text-sm font-medium text-primary hover:underline">
+            Check an existing registration
           </Link>
           <Link href="/signup" className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline">
             <UserPlus className="size-4" /> Request a Prefect account

@@ -27,13 +27,10 @@ type LookupData = {
   reference: string;
   visitorName: string;
   studentName: string;
-  studentRegistrationNumber: string;
   trade: string;
   level: string;
   className: string;
-  visitDate: string;
   visitDateLabel: string;
-  purpose: string;
   status: string;
   statusLabel: string;
   attendanceStatus: string;
@@ -164,8 +161,7 @@ export function CheckRegistrationForm({ defaultReference = "" }: { defaultRefere
                   </p>
                   <p className="text-sm font-semibold text-navy">{result.studentName}</p>
                   <p className="text-[11px] text-slate-400">
-                    {result.studentRegistrationNumber} · {result.trade} {result.level} ·{" "}
-                    {result.className}
+                    {result.trade} {result.level} · {result.className}
                   </p>
                 </div>
               </div>
@@ -181,7 +177,6 @@ export function CheckRegistrationForm({ defaultReference = "" }: { defaultRefere
                     Visit date
                   </p>
                   <p className="text-sm font-semibold text-navy">{result.visitDateLabel}</p>
-                  <p className="text-[11px] text-slate-400">Purpose: {result.purpose}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -204,7 +199,7 @@ export function CheckRegistrationForm({ defaultReference = "" }: { defaultRefere
             <div className="rounded-xl bg-surface p-4 text-[12px] leading-relaxed text-slate-500 sm:col-span-2">
               <span className="font-semibold text-navy">Submitted:</span> {result.submittedAt} ·{" "}
               <span className="font-semibold text-navy">Status:</span> {result.statusLabel}. Please
-              present this reference and a valid ID at the school reception on visit day.
+              present this reference at the school reception on Visit Day.
             </div>
           </div>
         </Card>

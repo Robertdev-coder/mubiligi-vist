@@ -7,7 +7,12 @@ import bcrypt from "bcryptjs";
 import { addDays, format } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { KIGALI_TZ, todayKigali } from "@/shared/utils";
-import { DEFAULT_ROLE_PERMISSIONS, DEFAULT_ROLES, PERMISSIONS } from "@/shared/constants";
+import {
+  DEFAULT_ROLE_PERMISSIONS,
+  DEFAULT_ROLES,
+  DEFAULT_VISIT_DATE,
+  PERMISSIONS,
+} from "@/shared/constants";
 
 const globalForDb = globalThis as unknown as { __mubiligiDb?: DatabaseSync };
 
@@ -216,6 +221,9 @@ function addColumn(db: DatabaseSync, table: string, definition: string) {
 
 function migrate(db: DatabaseSync) {
   db.exec(SCHEMA);
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS app_migrations (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)",
+  );
   addColumn(db, "profiles", "role_key TEXT NOT NULL DEFAULT 'dean'");
   addColumn(db, "profiles", "phone_number TEXT");
   addColumn(db, "profiles", "status TEXT NOT NULL DEFAULT 'active'");
@@ -334,6 +342,44 @@ function seed(db: DatabaseSync) {
   seedRbac(db, now);
 }
 
+function ensureDefaultVisitDay(db: DatabaseSync) {
+  const visitDate = DEFAULT_VISIT_DATE;
+  const existing = db
+    .prepare("SELECT id FROM visit_days WHERE visit_date = ? LIMIT 1")
+    .get(visitDate);
+  if (existing) return;
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO visit_days (
+       id, title, visit_date, registration_open, registration_close, is_active, instructions, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+  ).run(
+    randomUUID(),
+    "MUBILIGI Visit Day",
+    visitDate,
+    fromZonedTime("2027-09-24T00:00:00", KIGALI_TZ).toISOString(),
+    fromZonedTime("2027-11-08T23:59:59", KIGALI_TZ).toISOString(),
+    "Visit Day is scheduled for 8 November 2027.",
+    now,
+    now,
+  );
+}
+
+function addPrefectReportPermissions(db: DatabaseSync, now: string) {
+  const migrationId = "prefect-report-permissions-v1";
+  const applied = db.prepare("SELECT id FROM app_migrations WHERE id = ?").get(migrationId);
+  if (applied) return;
+
+  const insert = db.prepare(
+    "INSERT OR IGNORE INTO role_permissions (role_key, permission_key) VALUES ('prefect', ?)",
+  );
+  for (const permission of ["reports.view", "reports.export", "reports.print", "reports.email"]) {
+    insert.run(permission);
+  }
+  db.prepare("INSERT INTO app_migrations (id, applied_at) VALUES (?, ?)").run(migrationId, now);
+}
+
 function seedRbac(db: DatabaseSync, now: string) {
   const insertRole = db.prepare(
     `INSERT OR IGNORE INTO roles (key, name, description, is_system, created_at, updated_at)
@@ -393,6 +439,8 @@ export function getDb(): DatabaseSync {
   const db = new DatabaseSync(dbPath, { timeout: 5000 });
   migrate(db);
   seed(db);
+  addPrefectReportPermissions(db, new Date().toISOString());
+  ensureDefaultVisitDay(db);
   globalForDb.__mubiligiDb = db;
   return db;
 }
