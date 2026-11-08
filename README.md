@@ -1,6 +1,7 @@
 # Mubiligi Visit Day
 
 Next.js 15 app for managing visit-day registrations, attendance, and reports.
+This repository is the Mubiligi visitor registration and attendance system.
 
 ## Project structure
 
